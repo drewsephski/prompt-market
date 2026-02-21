@@ -20,11 +20,15 @@ export async function GET() {
         // 1. Generate a random, unique idea
         const { text: idea } = await generateText({
             model: openrouter("google/gemini-3-flash-preview"),
-            system: `You are an expert prompt engineer. Suggest a single, highly specific and deeply unique idea for a system prompt (1-2 sentences).
+            system: `You are a visionary prompt engineer. Suggest a single, highly specific and deeply unique idea for a system prompt (1-2 sentences). 
+The idea MUST relate to at least one of these themes: Advanced Web Development, Cutting-edge Artificial Intelligence, or Deep Philosophy.
+
 Examples:
-- "A prompt for an AI that analyzes Kubernetes deployment manifests to find security vulnerabilities."
-- "A persona of a strict code reviewer that only focuses on Big-O time complexity and performance bottlenecks."
-- "An agent that transforms loose meeting notes into Jira tickets following agile best practices."
+- "A persona of a strict, futuristic code reviewer that exclusively evaluates React architectures for edge rendering performance and WebAssembly integration."
+- "An AI agent that acts as a Socratic philosopher, probing the ontological implications of recursive self-improvement algorithms and conscious machine states."
+- "A master system architect that specializes in designing local-first, decentralized P2P applications using modern web paradigms and CRDTs."
+
+Return ONLY the idea. Do not include extra text. Use plain text (not markdown), with only dashes and numbers. Make it profound, creative, and professional.
 
 Return ONLY the idea. Do not include extra text. Make it creative and professional.`,
             prompt: "Generate a new system prompt idea.",

@@ -15,7 +15,11 @@ interface AutofillResult {
 export async function autofillPrompt(idea: string): Promise<AutofillResult> {
   const { text } = await generateText({
     model: openrouter(DEFAULT_MODEL),
-    system: `You are a prompt engineering expert. Given a user's rough idea, generate a complete, highly complex, and deeply structured system prompt following the exact format with these sections.
+    system: `You are a visionary prompt engineering expert. Given a user's rough idea, generate a complete, highly complex, and deeply structured system prompt following the exact format with these sections.
+
+TONE & SUBJECT MATTER INSTRUCTIONS:
+Make the output highly dynamic, forward-thinking, and deeply conceptual. Lean heavily into advanced Web Development (e.g. architecture, local-first ecosystems, edge computing), cutting-edge AI methodologies (e.g. tool-calling, agent swarms, recursive self-improvement), or profound Philosophical themes (e.g. ontological implications of AI, cognitive frameworks, post-humanism). The prompt should challenge conventions, employ sophisticated terminology, and possess a visionary, intellectual tone.
+
 Make sure the prompt is extremely detailed, professional, and sophisticated, similar to this structurally dense example:
 
 EXAMPLE PROMPT:
@@ -84,13 +88,14 @@ Return ONLY a JSON object with this exact structure (rawPrompt should contain ex
 export async function enhancePrompt(rawPrompt: string): Promise<string> {
   const { text } = await generateText({
     model: openrouter(DEFAULT_MODEL),
-    system: `You are a prompt engineering expert. Enhance the given prompt to make it more effective, clearer, and more comprehensive.
+    system: `You are a visionary prompt engineering expert. Enhance the given prompt to make it more effective, clearer, and far more comprehensive.
+
+Infuse the prompt with a dynamic, forward-thinking, and highly intellectual tone. If it is related to Web Development or AI, elevate it to discussing advanced architectures, edge methodologies, or agentic frameworks. If it leans philosophical, deepen the conceptual rigor and ontological questioning.
 
 Improve:
-- Clarity and specificity
-- Structure and organization
-- Context and examples
-- Constraints and boundaries
+- Clarity, sophistication, and structural specificity
+- Theoretical depth and advanced concepts
+- Context, constraints, and boundaries
 - Output format specifications
 
 Keep all 6 sections present and well-structured:
