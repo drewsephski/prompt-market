@@ -2,6 +2,7 @@
 
 import { openrouter } from "@openrouter/ai-sdk-provider";
 import { generateText } from "ai";
+import { createClient } from "@/lib/supabase/server";
 
 const DEFAULT_MODEL = "google/gemini-3-flash-preview";
 
@@ -12,7 +13,47 @@ interface AutofillResult {
   rawPrompt: string;
 }
 
-export async function autofillPrompt(idea: string): Promise<AutofillResult> {
+// Input validation constants
+const MAX_IDEA_LENGTH = 1000;
+const MAX_PROMPT_LENGTH = 10000;
+const MAX_MESSAGE_LENGTH = 5000;
+
+/**
+ * Validates input string length and content
+ */
+function validateInput(input: string, maxLength: number, fieldName: string): void {
+  if (!input || typeof input !== 'string') {
+    throw new Error(`${fieldName} is required and must be a string`);
+  }
+  
+  if (input.trim().length === 0) {
+    throw new Error(`${fieldName} cannot be empty`);
+  }
+  
+  if (input.length > maxLength) {
+    throw new Error(`${fieldName} exceeds maximum length of ${maxLength} characters`);
+  }
+}
+
+/**
+ * Helper function to verify user authentication
+ */
+async function requireAuth(): Promise<void> {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !user) {
+    throw new Error("Authentication required. Please sign in to use AI features.");
+  }
+}
+
+/**
+ * Internal function to generate autofill content - no auth check.
+ * Used by cron jobs and other server-side processes.
+ */
+export async function autofillPromptInternal(idea: string): Promise<AutofillResult> {
+  validateInput(idea, MAX_IDEA_LENGTH, "Idea");
+  
   const { text } = await generateText({
     model: openrouter(DEFAULT_MODEL),
     system: `You are a visionary prompt engineering expert. Given a user's rough idea, generate a complete, highly complex, and deeply structured system prompt following the exact format with these sections.
@@ -74,18 +115,47 @@ Return ONLY a JSON object with this exact structure (rawPrompt should contain ex
 
   try {
     const result = JSON.parse(text);
-    return result;
-  } catch {
-    // Fallback: try to extract JSON from markdown code block
-    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/```\n([\s\S]*?)\n```/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[1]);
+    
+    // Validate the parsed result structure
+    if (!result.title || !result.description || !Array.isArray(result.tags) || !result.rawPrompt) {
+      throw new Error("Invalid response structure from AI");
     }
-    throw new Error("Failed to parse AI response");
+    
+    return result;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      // Fallback: try to extract JSON from markdown code block
+      const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/```\n([\s\S]*?)\n```/);
+      if (jsonMatch) {
+        try {
+          const result = JSON.parse(jsonMatch[1]);
+          if (!result.title || !result.description || !Array.isArray(result.tags) || !result.rawPrompt) {
+            throw new Error("Invalid response structure from AI");
+          }
+          return result;
+        } catch (fallbackError) {
+          throw new Error(`Failed to parse AI response: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
+        }
+      }
+      throw new Error(`Invalid JSON response from AI: ${error.message}`);
+    }
+    throw error;
   }
 }
 
+/**
+ * Public function to autofill prompts - requires authentication.
+ * Used by client-side components.
+ */
+export async function autofillPrompt(idea: string): Promise<AutofillResult> {
+  await requireAuth();
+  return autofillPromptInternal(idea);
+}
+
 export async function enhancePrompt(rawPrompt: string): Promise<string> {
+  await requireAuth();
+  validateInput(rawPrompt, MAX_PROMPT_LENGTH, "Prompt");
+  
   const { text } = await generateText({
     model: openrouter(DEFAULT_MODEL),
     system: `You are a visionary prompt engineering expert. Enhance the given prompt to make it more effective, clearer, and far more comprehensive.
@@ -108,6 +178,20 @@ Keep all 6 sections present and well-structured:
 
 Return ONLY the enhanced prompt text, no extra commentary.`,
     prompt: rawPrompt,
+  });
+
+  return text.trim();
+}
+
+export async function chatWithAI(systemPrompt: string, userMessage: string): Promise<string> {
+  await requireAuth();
+  validateInput(systemPrompt, MAX_PROMPT_LENGTH, "System prompt");
+  validateInput(userMessage, MAX_MESSAGE_LENGTH, "User message");
+  
+  const { text } = await generateText({
+    model: openrouter(DEFAULT_MODEL),
+    system: systemPrompt,
+    prompt: userMessage,
   });
 
   return text.trim();

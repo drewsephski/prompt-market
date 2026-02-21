@@ -1,6 +1,6 @@
 import { openrouter } from "@openrouter/ai-sdk-provider";
 import { generateText } from "ai";
-import { autofillPrompt } from "@/app/ai-actions";
+import { autofillPromptInternal } from "@/app/ai-actions";
 import { createClient } from "@supabase/supabase-js";
 import { parsePrompt, generateSlug } from "@/lib/parser";
 
@@ -37,7 +37,7 @@ Return ONLY the idea. Do not include extra text. Make it creative and profession
         console.log("Idea generated:", idea);
 
         // 2. Autofill the prompt structure using the existing action
-        const result = await autofillPrompt(idea);
+        const result = await autofillPromptInternal(idea);
         console.log("Autofilled prompt structure with title:", result.title);
 
         // 3. Parse into sections

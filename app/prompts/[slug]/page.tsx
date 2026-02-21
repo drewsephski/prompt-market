@@ -40,6 +40,22 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function AddToChatButton({ text }: { text: string }) {
+  const handleAddToChat = () => {
+    const encodedPrompt = encodeURIComponent(text);
+    window.open(`/chat?prompt=${encodedPrompt}`, '_blank');
+  };
+
+  return (
+    <button
+      onClick={handleAddToChat}
+      className="inline-flex items-center gap-2 border border-neutral-800 bg-neutral-900/50 px-4 py-2 font-mono text-sm text-neutral-400 transition-all hover:border-neutral-700 hover:bg-neutral-900 hover:text-neutral-200"
+    >
+      ADD TO CHAT
+    </button>
+  );
+}
+
 export default function PromptPage({ params }: PageProps) {
   const [prompt, setPrompt] = useState<ReturnType<typeof getPrompt> extends Promise<infer R> ? R extends { prompt: infer P } ? P : null : null | null>(null);
   const [sections, setSections] = useState<ReturnType<typeof getPrompt> extends Promise<infer R> ? R extends { sections: infer S } ? S : [] : []>([]);
@@ -51,14 +67,14 @@ export default function PromptPage({ params }: PageProps) {
       try {
         const { slug } = await params;
         const result = await getPrompt(slug);
-        
+
         if ("error" in result) {
           setError(result.error ?? null);
         } else {
           setPrompt(result.prompt);
           setSections(result.sections);
         }
-      } catch (err) {
+      } catch {
         setError("Failed to load prompt");
       } finally {
         setLoading(false);
@@ -85,8 +101,8 @@ export default function PromptPage({ params }: PageProps) {
     return (
       <div className="min-h-screen bg-neutral-950 text-neutral-100">
         <main className="mx-auto max-w-4xl px-6 py-24">
-          <Link 
-            href="/prompts" 
+          <Link
+            href="/prompts"
             className="mb-8 block font-mono text-xs tracking-widest text-neutral-500 transition-colors hover:text-emerald-400"
           >
             ← BACK TO LIBRARY
@@ -103,7 +119,7 @@ export default function PromptPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       {/* Noise texture overlay */}
-      <div 
+      <div
         className="pointer-events-none fixed inset-0 opacity-[0.03]"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
@@ -115,8 +131,8 @@ export default function PromptPage({ params }: PageProps) {
 
       <main className="relative mx-auto max-w-4xl px-6 py-24">
         {/* Back link */}
-        <Link 
-          href="/prompts" 
+        <Link
+          href="/prompts"
           className="mb-12 block font-mono text-xs tracking-widest text-neutral-500 transition-colors hover:text-emerald-400"
         >
           ← BACK TO LIBRARY
@@ -128,19 +144,22 @@ export default function PromptPage({ params }: PageProps) {
             <h1 className="font-serif text-5xl font-light text-white lg:text-6xl">
               {prompt.title}
             </h1>
-            <CopyButton text={fullPromptText} />
+            <div className="flex gap-3">
+              <CopyButton text={fullPromptText} />
+              <AddToChatButton text={fullPromptText} />
+            </div>
           </div>
-          
+
           {prompt.description && (
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-neutral-400">
               {prompt.description}
             </p>
           )}
-          
+
           {prompt.tags && prompt.tags.length > 0 && (
             <div className="mt-8 flex flex-wrap gap-3">
               {prompt.tags.map((tag: string) => (
-                <span 
+                <span
                   key={tag}
                   className="border border-neutral-800 bg-neutral-900/50 px-3 py-1 font-mono text-xs text-neutral-400"
                 >
@@ -154,7 +173,7 @@ export default function PromptPage({ params }: PageProps) {
         {/* Sections */}
         <article className="space-y-12">
           {sections.map((section) => (
-            <section 
+            <section
               key={section.id}
               className="border-l-2 border-neutral-800 pl-8 transition-colors hover:border-emerald-500/50"
             >
@@ -182,11 +201,11 @@ export default function PromptPage({ params }: PageProps) {
         {/* Footer */}
         <footer className="mt-24 border-t border-neutral-800 pt-8">
           <p className="font-mono text-xs text-neutral-600">
-            Created on {new Date(prompt.created_at).toLocaleDateString('en-US', { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
+            Created on {prompt.created_at ? new Date(prompt.created_at).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            }) : 'Unknown date'}
           </p>
         </footer>
       </main>
