@@ -3,11 +3,10 @@
 import { createBrowserClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -67,17 +66,17 @@ export default function ForgotPasswordPage() {
                 />
               </svg>
             </div>
-            
+
             <h1 className="mb-2 font-serif text-3xl text-white">Check your email</h1>
             <p className="mb-8 font-mono text-sm text-neutral-400">
               We sent a password reset link to <span className="text-emerald-400">{email}</span>
             </p>
-            
+
             <div className="space-y-4">
               <p className="font-mono text-xs text-neutral-500">
                 Click the link in the email to reset your password. If you don&apos;t see it, check your spam folder.
               </p>
-              
+
               <button
                 onClick={() => router.push("/login")}
                 className="w-full border border-emerald-500/30 bg-emerald-500/10 px-8 py-4 font-mono text-sm text-emerald-400 transition-all hover:border-emerald-500/50 hover:bg-emerald-500/20"

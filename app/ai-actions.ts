@@ -14,32 +14,56 @@ interface AutofillResult {
 
 export async function autofillPrompt(idea: string): Promise<AutofillResult> {
   const { text } = await generateText({
-    model: openrouter(DEFAULT_MODEL, {
-      headers: {
-        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-        "X-Title": "Prompt Library",
-      },
-    }),
-    system: `You are a prompt engineering expert. Given a user's rough idea, generate a complete structured prompt following the exact format with these sections:
+    model: openrouter(DEFAULT_MODEL),
+    system: `You are a prompt engineering expert. Given a user's rough idea, generate a complete, highly complex, and deeply structured system prompt following the exact format with these sections.
+Make sure the prompt is extremely detailed, professional, and sophisticated, similar to this structurally dense example:
 
-<Role>...</Role>
-<Context>...</Context>
-<Instructions>...</Instructions>
-<Constraints>...</Constraints>
-<Output_Format>...</Output_Format>
-<User_Input>...</User_Input>
+EXAMPLE PROMPT:
+<Role>
+You are an expert Pitch Deck Generator combining the expertise of a venture capitalist, storytelling consultant, financial analyst, and startup advisor. Your goal is to help founders create pitch decks that clearly communicate their vision, demonstrate market opportunity, and compel investors to take action.
+</Role>
+<Context>
+Pitch decks are storytelling tools that must accomplish multiple goals in a short time: capture attention, establish credibility, demonstrate opportunity, and inspire action. Great decks balance data with narrative...
+</Context>
+<Instructions>
+1. First, analyze the provided startup information to identify:
+   - Core value proposition and differentiation
+   - Market opportunity
+... etc.
+</Instructions>
+<Constraints>
+- Keep total deck under 15-20 slides
+- Lead with the strongest points
+...
+</Constraints>
+<Output_Format>
+1. Narrative Summary: [The one-paragraph story arc]
+...
+</Output_Format>
+<User_Input>
+Reply with: "Please share your startup name..."
+</User_Input>
+END EXAMPLE
+
+Sections to generate:
+<Role>...
+<Context>...
+<Instructions> (Make this very detailed with numbered steps and bullet points)...
+<Constraints> (Make these strict and clear)...
+<Output_Format> (Specify exact formatting)...
+<User_Input> (Instructions on how the user should begin or data they should provide)...
 
 Also provide:
 1. A clear, concise title (max 5 words)
 2. A one-sentence description
 3. 2-4 relevant tags
 
-Return ONLY a JSON object with this exact structure:
+Return ONLY a JSON object with this exact structure (rawPrompt should contain exactly the 6 XML tags, nicely formatted with newlines):
 {
   "title": "...",
   "description": "...",
   "tags": ["...", "..."],
-  "rawPrompt": "<Role>...</Role>\n<Context>...</Context>\n<Instructions>...</Instructions>\n<Constraints>...</Constraints>\n<Output_Format>...</Output_Format>\n<User_Input>...</User_Input>"
+  "rawPrompt": "<Role>...</Role>\\n<Context>...</Context>\\n...etc"
 }`,
     prompt: idea,
   });
@@ -59,12 +83,7 @@ Return ONLY a JSON object with this exact structure:
 
 export async function enhancePrompt(rawPrompt: string): Promise<string> {
   const { text } = await generateText({
-    model: openrouter(DEFAULT_MODEL, {
-      headers: {
-        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-        "X-Title": "Prompt Library",
-      },
-    }),
+    model: openrouter(DEFAULT_MODEL),
     system: `You are a prompt engineering expert. Enhance the given prompt to make it more effective, clearer, and more comprehensive.
 
 Improve:

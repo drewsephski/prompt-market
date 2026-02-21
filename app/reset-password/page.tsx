@@ -2,10 +2,10 @@
 
 import { createBrowserClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [password, setPassword] = useState("");
@@ -18,7 +18,7 @@ export default function ResetPasswordPage() {
     // Check if we have the required parameters
     const accessToken = searchParams.get('access_token');
     const refreshToken = searchParams.get('refresh_token');
-    
+
     if (!accessToken || !refreshToken) {
       setError("Invalid or expired reset link. Please request a new password reset.");
       setIsTokenValid(false);
@@ -29,7 +29,7 @@ export default function ResetPasswordPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
@@ -118,12 +118,12 @@ export default function ResetPasswordPage() {
                 />
               </svg>
             </div>
-            
+
             <h1 className="mb-2 font-serif text-3xl text-white">Invalid Reset Link</h1>
             <p className="mb-8 font-mono text-sm text-neutral-400">
               {error || "This password reset link is invalid or has expired."}
             </p>
-            
+
             <div className="space-y-4">
               <Link
                 href="/forgot-password"
@@ -131,7 +131,7 @@ export default function ResetPasswordPage() {
               >
                 REQUEST NEW RESET LINK
               </Link>
-              
+
               <Link
                 href="/login"
                 className="block w-full border border-neutral-800 px-8 py-4 text-center font-mono text-sm text-neutral-400 transition-all hover:border-neutral-700 hover:text-neutral-200"
@@ -228,5 +228,13 @@ export default function ResetPasswordPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordContent />
+    </Suspense>
   );
 }
