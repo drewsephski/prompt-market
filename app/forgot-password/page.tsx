@@ -19,12 +19,25 @@ export default function ForgotPasswordPage() {
 
     const supabase = createBrowserClient();
     const getSiteUrl = () => {
+      // In production, use the configured site URL
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+      if (siteUrl) {
+        return siteUrl;
+      }
+      
+      // For Vercel deployments, use the Vercel URL
+      const vercelUrl = process.env.NEXT_PUBLIC_VERCEL_URL;
+      if (vercelUrl) {
+        return `https://${vercelUrl}`;
+      }
+      
+      // Fallback to current origin (this will be localhost in development)
       if (typeof window !== 'undefined') {
         return window.location.origin;
       }
-      return process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_VERCEL_URL 
-        ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` 
-        : 'http://localhost:3000';
+      
+      // Final fallback
+      return 'http://localhost:3000';
     };
     
     const { error } = await supabase.auth.resetPasswordForEmail(email, {

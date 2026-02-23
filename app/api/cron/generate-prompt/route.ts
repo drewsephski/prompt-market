@@ -1,8 +1,22 @@
 import { openrouter } from "@openrouter/ai-sdk-provider";
 import { generateText } from "ai";
-import { autofillPromptInternal } from "@/app/ai-actions";
+import { autofillPromptInternal, generateSimpleComprehensivePrompt, generateComplexGeneralPrompt } from "@/app/ai-actions";
 import { createClient } from "@supabase/supabase-js";
-import { parsePrompt, generateSlug } from "@/lib/parser";
+import { parsePrompt } from "@/lib/parser";
+import { generateUniqueSlug, logError } from "@/lib/utils";
+import { categorizePrompt } from "@/lib/categorization";
+
+// Validate required environment variables
+const requiredEnvVars = {
+  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+};
+
+for (const [key, value] of Object.entries(requiredEnvVars)) {
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+}
 
 // We use the service role key to bypass RLS for background cron jobs
 const supabase = createClient(
@@ -36,40 +50,67 @@ Return ONLY the idea. Do not include extra text. Make it creative and profession
 
         console.log("Idea generated:", idea);
 
-        // 2. Autofill the prompt structure using the existing action
-        const result = await autofillPromptInternal(idea);
-        console.log("Autofilled prompt structure with title:", result.title);
+        // 2. Randomly choose generation style for variety
+        const generationStyles = ['visionary', 'simple', 'complex'];
+        const randomStyle = generationStyles[Math.floor(Math.random() * generationStyles.length)];
+        
+        let result;
+        switch (randomStyle) {
+            case 'simple':
+                console.log("Using simple yet comprehensive generation style");
+                result = await generateSimpleComprehensivePrompt(idea);
+                break;
+            case 'complex':
+                console.log("Using complex but general generation style");
+                result = await generateComplexGeneralPrompt(idea);
+                break;
+            case 'visionary':
+            default:
+                console.log("Using visionary generation style (original)");
+                result = await autofillPromptInternal(idea);
+                break;
+        }
+        
+        console.log("Generated prompt structure with title:", result.title);
+        
+        // Enhanced categorization using the new utility
+        const category = categorizePrompt(result.tags, result.title, result.description);
+        console.log(`Categorized generated prompt as: ${category}`);
+        
+        // Add category as a tag if not already present
+        if (!result.tags.includes(category)) {
+            result.tags.push(category);
+        }
 
         // 3. Parse into sections
         let sections;
         try {
             sections = parsePrompt(result.rawPrompt);
         } catch (err) {
-            console.error("Failed to parse the generated rawPrompt:", err);
+            logError("cron - parsePrompt", err, { idea, title: result.title });
             throw err;
         }
 
-        // 4. Generate slug and handle collisions
-        let slug = generateSlug(result.title);
-        const { data: existing } = await supabase
-            .from("prompts")
-            .select("slug")
-            .eq("slug", slug)
-            .single();
-
-        if (existing) {
-            slug = `${slug}-${Math.random().toString(36).substring(2, 7)}`;
+        // 4. Generate slug and handle collisions with retry logic
+        let slug;
+        try {
+            slug = await generateUniqueSlug(result.title);
+        } catch (error) {
+            logError("cron - generateSlug", error, { title: result.title });
+            throw new Error(`Failed to generate unique slug: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
 
         // 5. Insert into Database
-        // Note: If `created_by` is strongly typed to UUID and required, this might fail 
-        // unless we have a specific system user ID. We will try omitting it first.
-        // If it fails, we will need to create a system user or modify the DB setup.
+        // Use a system user ID for cron-generated prompts
+        const SYSTEM_USER_ID = process.env.SYSTEM_USER_ID || '00000000-0000-0000-0000-000000000000';
+        
         const insertData = {
             slug,
             title: result.title,
             description: result.description,
             tags: result.tags,
+            created_by: SYSTEM_USER_ID, // Add system user ID
+            is_private: false, // Cron-generated prompts are public
         };
 
         const { data: prompt, error: promptError } = await supabase
@@ -85,7 +126,9 @@ Return ONLY the idea. Do not include extra text. Make it creative and profession
 
         // 6. Insert sections
         const sectionsWithPromptId = sections.map((s) => ({
-            ...s,
+            section_type: s.section_type,
+            content: s.content,
+            position: s.position,
             prompt_id: prompt.id,
         }));
 

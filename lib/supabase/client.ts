@@ -10,3 +10,5 @@ export function createBrowserClient() {
 
   return createClient(supabaseUrl, supabaseKey);
 }
+
+export { createClient };

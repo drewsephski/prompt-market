@@ -1,9 +1,12 @@
 "use client";
 
 import { listPrompts } from "@/app/actions";
+import { createBrowserClient } from "@/lib/supabase/client";
 import AuthNav from "@/app/components/AuthNav";
+import ComplexitySelector from "@/app/components/ComplexitySelector";
+import { categorizePrompt, getCategories, getCategoryStyles, getCategoryColor } from "@/lib/categorization";
 import Link from "next/link";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 
 interface Prompt {
   id: string;
@@ -12,144 +15,234 @@ interface Prompt {
   description: string | null;
   tags: string[];
   created_at: string;
+  created_by: string;
+  is_private?: boolean;
 }
 
-const FILTER_STYLES: Record<string, { active: string; count: string; hover: string }> = {
-  all: {
-    active: "border-emerald-500/50 bg-emerald-500/10 text-emerald-400",
-    count: "text-emerald-500/60",
-    hover: "group-hover:text-emerald-400",
-  },
-  frontend: {
-    active: "border-rose-500/50 bg-rose-500/10 text-rose-400",
-    count: "text-rose-500/60",
-    hover: "group-hover:text-rose-400",
-  },
-  backend: {
-    active: "border-blue-500/50 bg-blue-500/10 text-blue-400",
-    count: "text-blue-500/60",
-    hover: "group-hover:text-blue-400",
-  },
-  ai: {
-    active: "border-violet-500/50 bg-violet-500/10 text-violet-400",
-    count: "text-violet-500/60",
-    hover: "group-hover:text-violet-400",
-  },
-  founder: {
-    active: "border-amber-500/50 bg-amber-500/10 text-amber-400",
-    count: "text-amber-500/60",
-    hover: "group-hover:text-amber-400",
-  },
-  forensic: {
-    active: "border-cyan-500/50 bg-cyan-500/10 text-cyan-400",
-    count: "text-cyan-500/60",
-    hover: "group-hover:text-cyan-400",
-  },
-  creative: {
-    active: "border-pink-500/50 bg-pink-500/10 text-pink-400",
-    count: "text-pink-500/60",
-    hover: "group-hover:text-pink-400",
-  },
-  security: {
-    active: "border-red-500/50 bg-red-500/10 text-red-400",
-    count: "text-red-500/60",
-    hover: "group-hover:text-red-400",
-  },
-  data: {
-    active: "border-teal-500/50 bg-teal-500/10 text-teal-400",
-    count: "text-teal-500/60",
-    hover: "group-hover:text-teal-400",
-  },
-};
+interface Toast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
 
-const FILTER_CATEGORIES = {
-  all: { label: "All", icon: "◆" },
-  frontend: { label: "Frontend", icon: "◈" },
-  backend: { label: "Backend", icon: "◉" },
-  ai: { label: "AI / SDK", icon: "◊" },
-  founder: { label: "Founder", icon: "◆" },
-  forensic: { label: "Forensic", icon: "⌕" },
-  creative: { label: "Creative", icon: "✧" },
-  security: { label: "Security", icon: "⚿" },
-  data: { label: "Data", icon: "▤" },
-};
+function DeleteModal({ isOpen, onClose, onConfirm, promptTitle }: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  onConfirm: () => void; 
+  promptTitle: string;
+}) {
+  if (!isOpen) return null;
 
-const TAG_MAPPING: Record<string, string[]> = {
-  frontend: ["frontend", "react", "shadcn", "tailwind", "design-system", "ui", "components", "javascript", "typescript"],
-  backend: ["backend", "api", "fullstack", "architecture", "devops", "graphql", "rest", "web-dev"],
-  ai: ["ai-sdk", "ai-agent", "agents", "llm", "streaming", "tools", "tool-calling", "automation", "workflows", "vercel"],
-  founder: ["founder", "startup", "validation", "mvp", "pitch", "fundraising", "interview", "career"],
-  forensic: ["forensic", "investigation", "analysis", "linguistics", "legal", "audit", "analyst", "investigator", "detective"],
-  creative: ["creative", "writing", "storytelling", "marketing", "copywriting", "design", "art"],
-  security: ["security", "cybersecurity", "infosec", "vulnerability", "pentesting", "hacking"],
-  data: ["data", "analytics", "sql", "database", "python", "machine-learning", "statistics"],
-};
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 max-w-md mx-4">
+        <h2 className="font-serif text-xl text-white mb-4">Delete Prompt</h2>
+        <p className="text-neutral-300 mb-6">
+          Are you sure you want to delete &quot;<span className="text-emerald-400">{promptTitle}</span>&quot;? 
+          This action cannot be undone.
+        </p>   
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 font-mono text-sm text-neutral-400 border border-neutral-700 hover:border-neutral-600 hover:text-neutral-300 transition-colors"
+          >
+            CANCEL
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 font-mono text-sm text-white bg-red-500 border border-red-600 hover:bg-red-600 hover:border-red-500 transition-colors"
+          >
+            DELETE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-function getCategoryForTags(tags: string[]): string {
-  for (const [category, categoryTags] of Object.entries(TAG_MAPPING)) {
-    if (tags.some(tag => categoryTags.includes(tag))) {
-      return category;
+function Toast({ toast, onClose }: { toast: Toast | null; onClose: () => void }) {
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 3000);
+      return () => clearTimeout(timer);
     }
-  }
-  return "other";
+  }, [toast, onClose]);
+
+  if (!toast) return null;
+
+  const bgColor = {
+    success: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
+    error: 'bg-red-500/10 border-red-500/30 text-red-400',
+    info: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
+  }[toast.type];
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3">
+      <div className={`border ${bgColor} px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 max-w-md`}>
+        <div className="flex-shrink-0">
+          {toast.type === 'success' && (
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-8 8 0 018 0zm3.707-9.293a1 1 0 00-1.414 1.414l-4-4a1 1 0 00-1.414 1.414V10a1 1 0 001.414-1.414l4-4a1 1 0 001.414-1.414z" clipRule="evenodd"/>
+            </svg>
+          )}
+          {toast.type === 'error' && (
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-8 8 0 018 0zM8.707 7.293a3 3 0 00-4.243 4.243l1.414 1.414H10a1 1 0 011.414-1.414l-1.414-1.414a1 1 0 004.243-4.243l-1.414-1.414H8a1 1 0 00-1.414 1.414L8.707 7.293a3 3 0 004.243-4.243z" clipRule="evenodd"/>
+            </svg>
+          )}
+          {toast.type === 'info' && (
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 11-2 0 1 1 0 012 0z"/>
+            </svg>
+          )}
+        </div>
+        <div className="flex-shrink-0 font-mono text-sm">
+          {toast.message}
+        </div>
+        <button
+          onClick={onClose}
+          className="ml-4 text-neutral-400 hover:text-neutral-300 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 1.414L10 10.586l4.293 4.293a1 1 0 00-1.414-1.414L4.293 4.293zM4.293 15.707a1 1 0 011.414 1.414L10 5.414l4.293 4.293a1 1 0 00-1.414-1.414L4.293 15.707z" clipRule="evenodd"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
 }
+
+const FILTER_CATEGORIES = getCategories();
+const FILTER_STYLES = getCategoryStyles();
 
 export default function PromptsPage() {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showComplexitySelector, setShowComplexitySelector] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; promptId: string; promptTitle: string }>({ isOpen: false, promptId: '', promptTitle: '' });
+  const [toast, setToast] = useState<Toast | null>(null);
 
+  // Get current user ID for "My Prompts" filter
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const supabase = createBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id || null);
+    };
+    getCurrentUser();
+  }, []);
+
+  // Load prompts
   const loadPrompts = async () => {
     try {
+      setIsLoading(true);
       const result = await listPrompts();
-      if ("prompts" in result) {
-        setPrompts(result.prompts ?? []);
-      } else if ("error" in result) {
-        console.error("Failed to load prompts:", result.error);
+      if ('error' in result) {
+        console.error('Failed to load prompts:', result.error);
+        setToast({ id: Date.now().toString(), message: 'Failed to load prompts', type: 'error' });
+      } else {
+        setPrompts(result.prompts);
       }
-    } catch (err) {
-      console.error("Failed to load prompts:", err);
+    } catch (error) {
+      console.error('Error loading prompts:', error);
+      setToast({ id: Date.now().toString(), message: 'Error loading prompts', type: 'error' });
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Load prompts on component mount
   useEffect(() => {
     loadPrompts();
   }, []);
 
-  const handleGeneratePrompt = async () => {
-    setIsGenerating(true);
+  const handleDelete = (promptId: string, promptTitle: string) => {
+    // Find the prompt to get its slug
+    const prompt = prompts.find(p => p.id === promptId);
+    if (prompt) {
+      setDeleteModal({ isOpen: true, promptId: prompt.slug, promptTitle });
+    }
+  };
+
+  const handleGeneratePrompt = async (idea: string, complexity: 'simple' | 'complex' | 'visionary') => {
     try {
-      const res = await fetch("/api/cron/generate-prompt", {
-        method: "POST",
+      setIsGenerating(true);
+      
+      const response = await fetch('/api/generate-prompt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ idea, complexity }),
       });
-      if (res.ok) {
-        await loadPrompts();
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setToast({ 
+          id: Date.now().toString(), 
+          message: `${result.title} (${complexity}) generated successfully!`, 
+          type: 'success' 
+        });
+        setShowComplexitySelector(false);
+        // Reload prompts to show the new one
+        loadPrompts();
       } else {
-        console.error("Failed to generate prompt:", await res.text());
+        setToast({ id: Date.now().toString(), message: result.error || 'Failed to generate prompt', type: 'error' });
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error('Generate prompt error:', error);
+      setToast({ id: Date.now().toString(), message: 'Failed to generate prompt', type: 'error' });
     } finally {
       setIsGenerating(false);
     }
   };
 
-
-  const filteredPrompts = useMemo(() => {
-    if (activeFilter === "all") return prompts;
-    return prompts.filter(prompt => getCategoryForTags(prompt.tags) === activeFilter);
-  }, [prompts, activeFilter]);
-
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: prompts.length };
-    for (const category of Object.keys(TAG_MAPPING)) {
-      c[category] = prompts.filter(p => getCategoryForTags(p.tags) === category).length;
+  const confirmDelete = async () => {
+    try {
+      const response = await fetch(`/api/prompts/${deleteModal.promptId}/delete`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        setToast({ id: Date.now().toString(), message: 'Prompt deleted successfully', type: 'success' });
+        // Reload prompts to get the updated list
+        await loadPrompts();
+      } else {
+        setToast({ id: Date.now().toString(), message: 'Failed to delete prompt', type: 'error' });
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      setToast({ id: Date.now().toString(), message: 'Failed to delete prompt', type: 'error' });
+    } finally {
+      setDeleteModal({ isOpen: false, promptId: '', promptTitle: '' });
     }
-    return c;
-  }, [prompts]);
+  };
+
+  // Calculate counts for each filter category
+  const counts = {
+    all: prompts.length,
+    my: userId ? prompts.filter(p => p.created_by === userId).length : 0,
+    architecture: prompts.filter(p => categorizePrompt(p.tags, p.title, p.description) === 'architecture').length,
+    ai: prompts.filter(p => categorizePrompt(p.tags, p.title, p.description) === 'ai').length,
+    philosophy: prompts.filter(p => categorizePrompt(p.tags, p.title, p.description) === 'philosophy').length,
+    frontend: prompts.filter(p => categorizePrompt(p.tags, p.title, p.description) === 'frontend').length,
+    forensic: prompts.filter(p => categorizePrompt(p.tags, p.title, p.description) === 'forensic').length,
+    business: prompts.filter(p => categorizePrompt(p.tags, p.title, p.description) === 'business').length,
+    other: prompts.filter(p => categorizePrompt(p.tags, p.title, p.description) === 'other').length,
+  };
+
+  // Filter prompts based on active filter
+  const filteredPrompts = activeFilter === "all" 
+    ? prompts 
+    : activeFilter === "my" 
+    ? prompts.filter(p => p.created_by === userId)
+    : prompts.filter(p => categorizePrompt(p.tags, p.title, p.description) === activeFilter);
 
   if (isLoading) {
     return (
@@ -187,27 +280,42 @@ export default function PromptsPage() {
               All Prompts
             </h1>
             <p className="mt-2 font-mono text-sm text-neutral-500">
-              {prompts.length} {prompts.length === 1 ? 'prompt' : 'prompts'} in the library
+              {prompts.length} {prompts.length === 1 ? 'prompt' : 'prompts'} in library
+              {prompts.length < 26 && (
+                <span className="ml-2 text-yellow-400">
+                  (Debug: Expected 26, got {prompts.length})
+                </span>
+              )}
             </p>
           </div>
           <div className="flex flex-col items-end gap-4">
             <AuthNav />
-            <button
-              onClick={handleGeneratePrompt}
-              disabled={isGenerating}
-              className="inline-flex items-center justify-center border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 font-mono text-xs text-emerald-400 transition-all hover:border-emerald-500/50 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isGenerating ? "GENERATING..." : "✨ AUTOGENERATE PROMPT"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowComplexitySelector(true)}
+                disabled={isGenerating}
+                className="inline-flex items-center justify-center border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 font-mono text-xs text-emerald-400 transition-all hover:border-emerald-500/50 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isGenerating ? "GENERATING..." : "⚡ GENERATE PROMPT"}
+              </button>
+            </div>
           </div>
         </header>
+
+        {/* Complexity Selector - Always Visible */}
+        <div className="mb-12">
+          <ComplexitySelector
+            onGenerate={handleGeneratePrompt}
+            isGenerating={isGenerating}
+          />
+        </div>
 
         {/* Filter Bar */}
         <div className="mb-12 flex flex-wrap gap-2">
           {Object.entries(FILTER_CATEGORIES).map(([key, { label, icon }]) => {
             const isActive = activeFilter === key;
-            const count = counts[key] || 0;
-            const styles = FILTER_STYLES[key];
+            const count = counts[key as keyof typeof counts] || 0;
+            const styles = FILTER_STYLES[key as keyof typeof FILTER_STYLES];
 
             return (
               <button
@@ -231,6 +339,45 @@ export default function PromptsPage() {
           })}
         </div>
 
+        {/* Delete Modal */}
+        <DeleteModal
+          isOpen={deleteModal.isOpen}
+          onClose={() => setDeleteModal({ isOpen: false, promptId: '', promptTitle: '' })}
+          onConfirm={confirmDelete}
+          promptTitle={deleteModal.promptTitle}
+        />
+
+        {/* Toast Notification */}
+        <Toast
+          toast={toast}
+          onClose={() => setToast(null)}
+        />
+
+        {/* Complexity Selector Modal */}
+        {showComplexitySelector && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-neutral-900 border border-neutral-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto mx-4">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="font-serif text-2xl text-white">Generate Custom Prompt</h2>
+                  <button
+                    onClick={() => setShowComplexitySelector(false)}
+                    className="text-neutral-400 hover:text-neutral-300 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <ComplexitySelector
+                  onGenerate={handleGeneratePrompt}
+                  isGenerating={isGenerating}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {filteredPrompts.length === 0 ? (
           <div className="border border-neutral-800 bg-neutral-900/30 p-12 text-center">
             <p className="font-mono text-neutral-400">
@@ -248,18 +395,8 @@ export default function PromptsPage() {
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {filteredPrompts.map((prompt, i) => {
-              const category = getCategoryForTags(prompt.tags);
-              const categoryColor = {
-                frontend: 'group-hover:text-rose-400',
-                backend: 'group-hover:text-blue-400',
-                ai: 'group-hover:text-violet-400',
-                founder: 'group-hover:text-amber-400',
-                forensic: 'group-hover:text-cyan-400',
-                creative: 'group-hover:text-pink-400',
-                security: 'group-hover:text-red-400',
-                data: 'group-hover:text-teal-400',
-                other: 'group-hover:text-emerald-400',
-              }[category] || 'group-hover:text-emerald-400';
+              const category = categorizePrompt(prompt.tags, prompt.title, prompt.description);
+              const categoryColor = getCategoryColor(category);
 
               return (
                 <Link
@@ -268,6 +405,21 @@ export default function PromptsPage() {
                   className="group relative border border-neutral-800 bg-neutral-900/30 p-8 transition-all hover:border-neutral-700 hover:bg-neutral-900/50"
                   style={{ animationDelay: `${i * 50}ms` }}
                 >
+                  {/* Delete button for user's own prompts */}
+                  {prompt.created_by === userId && (
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDelete(prompt.id, prompt.title);
+                      }}
+                      className="absolute top-4 left-4 font-mono text-xs text-red-400 opacity-0 transition-opacity group-hover:opacity-100 inline-flex items-center gap-1 border border-red-500/30 bg-red-500/10 px-2 py-1 hover:border-red-500/50 hover:bg-red-500/20"
+                      title="Delete prompt"
+                    >
+                      ⟲
+                    </button>
+                  )}
+
                   {/* Index number */}
                   <div className="absolute right-4 top-4 font-mono text-xs text-neutral-700 transition-colors group-hover:text-neutral-500">
                     {String(i + 1).padStart(2, '0')}

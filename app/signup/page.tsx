@@ -101,7 +101,7 @@ export default function SignupPage() {
           {success ? (
             <div className="border border-emerald-500/30 bg-emerald-950/10 p-6">
               <p className="font-mono text-sm text-emerald-400">
-                ✅ Check your email! We&apos;ve sent you a confirmation link.
+                ⚡ Check your email! We&apos;ve sent you a confirmation link.
               </p>
             </div>
           ) : (

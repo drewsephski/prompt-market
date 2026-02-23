@@ -138,7 +138,7 @@ export default function CreatePage() {
           </Link>
 
           <div className="border border-neutral-800 bg-neutral-900/30 p-12 text-center">
-            <div className="mb-6 text-4xl">🔒</div>
+            <div className="mb-6 text-4xl">⚡</div>
             <h1 className="mb-4 font-serif text-3xl text-white">
               Sign In Required
             </h1>
@@ -193,7 +193,7 @@ export default function CreatePage() {
         {/* AI Autofill */}
         <div className="mb-12 border border-indigo-500/20 bg-indigo-950/10 p-6">
           <h3 className="mb-4 font-mono text-xs tracking-widest text-indigo-400">
-            ✨ AI AUTOFILL
+            ⚡ AI AUTOFILL
           </h3>
           <p className="mb-4 text-sm text-neutral-400">
             Describe what you want the prompt to do, and AI will generate the complete structured prompt.
@@ -215,7 +215,7 @@ export default function CreatePage() {
                 <span className="animate-pulse">GENERATING...</span>
               ) : (
                 <>
-                  <span>✨</span>
+                  <span>⚡</span>
                   AUTOFILL
                 </>
               )}
@@ -334,7 +334,7 @@ export default function CreatePage() {
                   <span className="animate-pulse">ENHANCING...</span>
                 ) : (
                   <>
-                    <span>✨</span>
+                    <span>⚡</span>
                     ENHANCE WITH AI
                   </>
                 )}
@@ -352,7 +352,7 @@ export default function CreatePage() {
 <Constraints>...</Constraints>
 <Output_Format>...</Output_Format>
 
-<!-- 👇 WHERE USERS ENTER THEIR INPUT -->
+<!-- ⬇ WHERE USERS ENTER THEIR INPUT -->
 <User_Input>...</User_Input>`}
               className="w-full border border-neutral-800 bg-neutral-900/30 px-4 py-3 font-mono text-sm text-white placeholder-neutral-600 transition-colors focus:border-emerald-500/50 focus:outline-none resize-y"
             />
